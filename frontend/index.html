@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MasterApp</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; }
+    h1 { color: #333; }
+    #status { padding: 10px; border-radius: 5px; margin: 10px 0; }
+    .ok { background: #d4edda; color: #155724; }
+    .error { background: #f8d7da; color: #721c24; }
+    #items { list-style: none; padding: 0; }
+    #items li { padding: 10px; margin: 5px 0; background: #f8f9fa; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>MasterApp</h1>
+  <div id="status">Chargement...</div>
+  <h2>Items</h2>
+  <ul id="items"></ul>
+
+  <script>
+    const API_URL = window.location.hostname === 'localhost'
+      ? 'http://localhost:3000'
+      : '/api';
+
+    fetch(`${API_URL}/api/health`)
+      .then(res => res.json())
+      .then(data => {
+        const el = document.getElementById('status');
+        el.textContent = `Backend: ${data.status}`;
+        el.className = 'ok';
+      })
+      .catch(() => {
+        const el = document.getElementById('status');
+        el.textContent = 'Backend indisponible';
+        el.className = 'error';
+      });
+
+    fetch(`${API_URL}/api/items`)
+      .then(res => res.json())
+      .then(items => {
+        const ul = document.getElementById('items');
+        items.forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = `${item.id} - ${item.name}`;
+          ul.appendChild(li);
+        });
+      });
+  </script>
+</body>
+</html>

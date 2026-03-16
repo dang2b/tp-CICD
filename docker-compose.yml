@@ -1,0 +1,16 @@
+services:
+  backend:
+    build: ./backend
+    container_name: masterapp-backend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: masterapp-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
