@@ -1,0 +1,221 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\geometry{a4paper, margin=2cm}
+\usepackage{tabularx}
+\usepackage{hyperref}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning}
+
+\title{TP CICD}
+\author{GUERRA Daniel, SANNA Thomas}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Audit du système existant}
+
+\subsection{Situation actuelle}
+
+\begin{tabularx}{\textwidth}{|l|X|}
+\hline
+\textbf{Processus} & \textbf{Description actuelle} \\
+\hline
+Déploiement & Manuel, sans procédure standardisée \\
+\hline
+Gestion du code & Push direct en production, pas de branches ni de revue de code \\
+\hline
+Configuration serveurs & Manuelle, sans documentation \\
+\hline
+Tests & Délégué à un prestataire, exécutés sur les machines personnelles des testeurs \\
+\hline
+Infrastructure & Serveur physique sur place, coûteux et peu scalable \\
+\hline
+\end{tabularx}
+
+\subsection{Problèmes identifiés}
+
+\subsubsection{1. Absence de pipeline CI/CD}
+\begin{itemize}
+    \item \textbf{Problème} : Les déploiements sont manuels et non reproductibles.
+    \item \textbf{Risque} : Erreurs humaines lors du déploiement, temps de mise en production long.
+    \item \textbf{Impact} : Les corrections critiques vont mettre trop de temps à arriver en production, ce qui dégrade, notamment, l'expérience utilisateur, mais aussi la confiance des clients.
+\end{itemize}
+
+\subsubsection{2. Push direct en production (pas de workflow Git)}
+\begin{itemize}
+    \item \textbf{Problème} : Il n'y a aucune stratégie de branches, mais aussi, pas de revue de code, ni de protection de la branche main.
+    \item \textbf{Risque} : On obtient rapidement du code non testé ou buggé qui arrive directement en production, et donc, comme le sujet l'indique, les fonctionnalités, qui, autrefois étaient fix, ne le sont plus, etc...
+    \item \textbf{Impact} : Instabilité constante de la plateforme, multiplication des bugs en production, puis, en conséquence, une perte de confiance des utilisateurs.
+\end{itemize}
+
+\subsubsection{3. Tests non automatisés et externalisés}
+\begin{itemize}
+    \item \textbf{Problème} : Les tests sont réalisés manuellement par un prestataire externe sur sa machine personnelle et donc sur des environnements non standardisés.
+    \item \textbf{Risque} : En conséquence de cela, on a une ouverture de tests incomplète et non reproductible, ainsi que des résultats varient selon l'environnement du testeur. Et pour introduire ce qu'on va faire après, aucun test n'est exécuté avant le déploiement.
+    \item \textbf{Impact} : Les régressions ne sont pas détectées avant la mise en production, ce qui explique probablement les plaintes des utilisateurs.
+\end{itemize}
+
+\subsubsection{4. Configuration manuelle des serveurs sans documentation}
+\begin{itemize}
+    \item \textbf{Problème} : Pas d'Infrastructure as Code (IaC), aucune documentation de la configuration serveur.
+    \item \textbf{Risque} : Impossibilité de recréer l'environnement en cas de panne. Configuration incohérente entre les environnements. Configuration diffère trop au fil du temps.
+    \item \textbf{Impact} : Temps de récupération très long en cas de problème, difficulté à diagnostiquer les problèmes, impossible de scaler.
+\end{itemize}
+
+\subsubsection{5. Serveur physique sur place}
+\begin{itemize}
+    \item \textbf{Problème} : Un seul serveur physique dans les locaux, coûteux en maintenance.
+    \item \textbf{Risque} : Point unique de défaillance. Pas de scalabilité horizontale. Coût d'entretien élevé sans bénéfice de haute disponibilité.
+    \item \textbf{Impact} : Performances dégradées sous charge, indisponibilité en cas de panne physique, coûts trop élevés par rapport au service donné.
+\end{itemize}
+
+\section{Proposition d'architecture DevOps}
+
+\subsection{Stratégie de gestion de code (GitFlow)}
+
+On utilise le GitFlow, un workflow adapté à notre situation. On l'a aussi déjà utilisé pour des projets cette année (et les années précédentes).
+
+\begin{enumerate}
+    \item La branche \texttt{main} contient que le code en production, stable et déployé. Personne push directement dessus.
+    \item La branche \texttt{develop} est la branche d'intégration où toutes les fonctionnalités sont mergées et testées ensemble avant d'aller en production.
+    \item Pour chaque nouvelle fonctionnalité ou correction, on crée une branche dédiée depuis develop (ex: feature/ajout-panier, fix/bug-login).
+    \item Une fois le développement fini, on ouvre une Pull Request (PR) sur develop.
+    \item La PR doit passer les tests automatisés et être validée par au moins un autre développeur (code review) avant d'être mergée.
+    \item Quand develop est stable et prêt pour une release, on merge develop sur main, ce qui déclenche le déploiement automatique en production.
+\end{enumerate}
+
+\subsection{Stratégie de gestion des branches}
+
+\begin{tabularx}{\textwidth}{|l|X|X|}
+\hline
+\textbf{Branche} & \textbf{Rôle} & \textbf{Protection} \\
+\hline
+main & Code en production, stable et déployé & Push direct interdit, merge uniquement depuis develop ou hotfix/* \\
+\hline
+develop & Branche d'intégration, où les features sont testées ensemble & Push direct interdit, merge uniquement via PR validée \\
+\hline
+feature/* & Développement de nouvelles fonctionnalités & Créée depuis develop, mergée dans develop, supprimée après merge \\
+\hline
+fix/* & Correction de bugs & Crééée depuis develop, mergée dans develop, supprimée après merge \\
+\hline
+hotfix/* & Correction urgente en production & Créée depuis main, mergée dans main ET develop \\
+\hline
+\end{tabularx}
+
+\subsection{Stratégie de tests automatisés}
+
+On met en place plusieurs niveaux de tests exécutés automatiquement dans le pipeline CI. 
+
+\begin{tabularx}{\textwidth}{|l|X|X|X|}
+\hline
+\textbf{Type de test} & \textbf{Objectif} & \textbf{Outil} & \textbf{Quand} \\
+\hline
+Tests unitaires & Vérifier chaque fonction/composant individuellement & Jest, Pytest, etc. (selon le langage) & A chaque push sur une branche \\
+\hline
+Tests d'intégration & Vérifier que le frontend, backend et BDD communiquent bien ensemble & Docker Compose + scripts de test & À chaque PR vers develop \\
+\hline
+Analyse statique & Détecter les erreurs de style et les mauvaises pratiques & ESLint, Flake8, etc. & À chaque push \\
+\hline
+\end{tabularx}
+
+Tout cela remplace le prestataire externe et garantit que les tests sont reproductibles, puisqu'ils tournent dans un environnement isolé (conteneurs Docker sur GitHub Actions).
+
+\subsection{Architecture d'infrastructure}
+
+On passe d'un serveur physique sur place à une infrastructure cloud en utilisant GitHub Actions qui exécute le pipeline CI/CD (build, tests et déploiement)n GHCR qui stocke les images Docker versionnées, et enfin le VPS Cloud (on a notamment utilisé AWS durant ces cours) qui va héberger l'application en production via des conteneurs Docker.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm and 2cm,
+    box/.style={draw, rectangle, minimum width=3.5cm, minimum height=1.5cm, align=center, fill=gray!10, rounded corners},
+    arrow/.style={-{Stealth[scale=1.2]}, thick}
+]
+    % Nodes
+    \node[box] (github) {Code Source \\ (GitHub / GitFlow)};
+    \node[box, right=of github] (gha) {GitHub Actions \\ (CI/CD Pipeline)};
+    \node[box, right=of gha] (ghcr) {GHCR \\ (Registre Docker)};
+    \node[box, below=of gha] (vps) {VPS Cloud (AWS) \\ (Production avec Docker)};
+
+    % Arrows
+    \draw[arrow] (github) -- (gha) node[midway, above, font=\footnotesize] {Push / PR};
+    \draw[arrow] (gha) -- (ghcr) node[midway, above, font=\footnotesize] {Build \& Push};
+    \draw[arrow] (ghcr) |- (vps) node[pos=0.75, right, font=\footnotesize] {Pull Image};
+    \draw[arrow] (gha) -- (vps) node[midway, right, font=\footnotesize] {Déploiement SSH};
+\end{tikzpicture}
+\caption{Schéma de l'architecture d'infrastructure DevOps}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{Solution de conteneurisation}
+
+On utilise Docker et \textbf{Docker Compose} pour conteneuriser l'application :
+
+\begin{tabularx}{\textwidth}{|l|X|l|}
+\hline
+\textbf{Service} & \textbf{Image} & \textbf{Port} \\
+\hline
+Frontend & masterapp-frontend & 80 \\
+\hline
+Backend & masterapp-backend & 3000 \\
+\hline
+Base de données & postgres (ou mysql) & 5432 \\
+\hline
+\end{tabularx}
+
+On obtiendra au final, bien un environnement identique en développement, test et production, un déploiement reproductible et rapide avec docker compose up -d, mais aussi une scalabilité facilitée  puisque l'on peut lancer plusieurs instances d'un service. 
+
+Le fait qu'on utilise plusieurs conteneurs (un pour chaque service plutôt qu'un seul regroupant front back et bdd) permet de, par exemple, éviter qu'un crash du backend n'impactera pas le frontend ou la bdd
+
+\section{Plan d'automatisation}
+
+\subsection{Construction du projet}
+
+La construction est automatisée avec les GitHub Actions. A chaque push sur une branche, la pipeline:
+
+\begin{enumerate}
+    \item Récupère le code source (actions/checkout) ;
+    \item Installe les dépendances du frontend et du backend ;
+    \item Build le projet (avec npm run build pour le frontend, par exemple).
+\end{enumerate}
+
+\subsection{Exécution des tests}
+
+Les tests sont déclenchés automatiquement dans le pipeline CI:
+
+\begin{enumerate}
+    \item A chaque push on exécution des tests unitaires et de l'analyse statique ;
+    \item A chaque PR vers la branche develop on fait l'exécution des tests d'intégration en plus avec Docker Compose ;
+    \item Si les tests ne passent pas, la PR ne peut pas être mergée.
+\end{enumerate}
+
+\subsection{Construction des images Docker}
+
+Une fois les tests passés, les images Docker sont build et publiées :
+
+\begin{enumerate}
+    \item Build des images Docker pour le frontend et le backend (docker build) ;
+    \item Tag des images avec le numéro de version et latest (docker tag) ;
+    \item Push des images sur GHCR (GitHub Container Registry).
+\end{enumerate}
+
+\subsection{Déploiement}
+
+Le déploiement est déclenché automatiquement lors du merge sur main, et suivent ces étapes : 
+
+\begin{enumerate}
+    \item Connexion au VPS via SSH (appleboy/ssh-action comme vu en cours) ;
+    \item Pull des dernières images depuis GHCR ;
+    \item Arrêt des anciens conteneurs ;
+    \item Lancement des nouveaux conteneurs avec \texttt{docker compose up -d} ;
+    \item Et pourquoi pas une vérification que l'application répond correctement (avec curl localhost:PORT par exemple).
+\end{enumerate}
+
+Il faut noter que nous utilisons GHCR plutôt que Docker Hub, premièrement, et la plus importante, car GHCR est une intégration native à GitHub. Ca nous simplifie alors la gestion des permissions (par ex. le GITHUB\_TOKEN). Et enfin, car Docker Hub est connu pour ses quotas stricts sur le nombre de pulls.
+
+\end{document}
