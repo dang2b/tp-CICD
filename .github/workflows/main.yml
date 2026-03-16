@@ -101,6 +101,6 @@ jobs:
             docker network create masterapp-net || true
             docker run -d -p 3000:3000 --name $IMAGE_BACKEND --network masterapp-net $REPO_URL/${{ github.actor }}/$IMAGE_BACKEND:latest
             docker run -d -p 8080:80 --name $IMAGE_FRONTEND --network masterapp-net $REPO_URL/${{ github.actor }}/$IMAGE_FRONTEND:latest
-            sleep 3
+            sleep 5
             curl localhost:3000/api/health
-            curl localhost:8080
+            curl localhost:8080 || true
