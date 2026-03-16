@@ -103,4 +103,4 @@ jobs:
             docker run -d -p 8080:80 --name $IMAGE_FRONTEND --network masterapp-net $REPO_URL/${{ github.actor }}/$IMAGE_FRONTEND:latest
             sleep 5
             curl localhost:3000/api/health
-            curl localhost:8080 || true
+            curl localhost:8080 || true 
